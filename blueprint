@@ -1,0 +1,72 @@
+blueprint:
+  name: Motion-activated step Light
+  description: Turn on a light when motion is detected and turn off with a step.
+  domain: automation
+  input:
+    motion_entity:
+      name: Motion Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    light_target:
+      name: Light
+      selector:
+        target:
+          entity:
+            domain: light
+    no_motion_wait:
+      name: Wait time
+      description: Time to leave the light on after last motion is detected.
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: seconds
+    step_time:
+      name: (optional) Step time
+      description: Time to dim the light before turned off.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: seconds
+    step_brightness:
+      name: (optional) Step brightness
+      description: Brightness of the light before turned off relative to the current brightness.
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: percent
+
+# If motion is detected within the delay,
+# we restart the script.
+mode: restart
+max_exceeded: silent
+
+trigger:
+  platform: state
+  entity_id: !input motion_entity
+  from: "off"
+  to: "on"
+
+action:
+  - service: light.turn_on
+    target: !input light_target
+  - wait_for_trigger:
+      platform: state
+      entity_id: !input motion_entity
+      from: "on"
+      to: "off"
+  - delay: !input no_motion_wait
+  - service: light.turn_on
+    data_template:
+        brightness: '{{ (state_attr('!input light_target',''brightness'') / (100/'!input step_brightness')|int }}'
+    target: !input light_target
+  - delay: !input step_time
+  - service: light.turn_off
+    target: !input light_target
